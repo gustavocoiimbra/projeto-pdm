@@ -3,8 +3,8 @@ import scrapy
 class LugarCertoSpider(scrapy.Spider):
   name = "LugarCerto"
   all_dominains = ['www.lugarcerto.com.br']
-  start_urls = ['https://www.lugarcerto.com.br/busca/compra-e-venda']
-  max_page = '4012'
+  start_urls = ['https://www.lugarcerto.com.br/busca/aluguel']
+  max_page = '5000'
 
   # Criando um padrão de como os links serão capturados e acessados
   def parse(self, response):
@@ -60,6 +60,7 @@ class LugarCertoSpider(scrapy.Spider):
     banheiros = [desc_caract[i] for i, x in enumerate(caract) if re.search('BANHEIRO', x)]
     vagas = [desc_caract[i] for i, x in enumerate(caract) if re.search('VAGA', x)]
     suite = [desc_caract[i] for i, x in enumerate(caract) if re.search('SUÍTE', x)]
+    desc_imovel = response.css('div[class="descricao__imovel"] p::text').getall()
 
 
     yield {
@@ -75,4 +76,7 @@ class LugarCertoSpider(scrapy.Spider):
         "suite" : suite,
         "area" : area_string,
         "anunciante" : anunciante,
+        "descricao_imovel": desc_imovel,
+        "link": str(response),
+        "tipo_anuncio": "aluguel"
       }

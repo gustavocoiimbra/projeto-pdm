@@ -2,8 +2,19 @@ import scrapy
 class ChavesNaMaoSpider(scrapy.Spider):
     name = "ChavesNaMao"
     allowed_domains = ["www.chavesnamao.com.br"]
-    start_urls = ["https://www.chavesnamao.com.br/imoveis-a-venda/sp-sao-paulo/"]
-    max_page = 50
+    # start_urls = ["https://www.chavesnamao.com.br/imoveis-a-venda/sp-sao-paulo/"]
+    # max_pages = 50
+
+    def __init__(self, estado="sp", cidade="sao-paulo", max_pages=50, *args, **kwargs):
+      self.estado = estado
+      self.cidade = cidade
+      self.max_pages = int(max_pages)
+      self.pag = 0
+      self.start_urls = [f"https://www.chavesnamao.com.br/casas-a-venda/{self.estado}-{self.cidade}/"]
+                        # https://www.chavesnamao.com.br/imoveis-para-alugar/sp-sao-paulo/
+                        # https://www.chavesnamao.com.br/apartamentos-a-venda/sp-sao-paulo/
+                        # https://www.chavesnamao.com.br/casas-a-venda/sp-sao-paulo/
+
 
     def parse(self, response):
       # Rastrear todos os links das páginas
@@ -13,11 +24,12 @@ class ChavesNaMaoSpider(scrapy.Spider):
         yield response.follow(link, self.extract_data)
 
 
-      if self.max_page != 0:
-        self.max_page -= 1
+      if self.pag != self.max_pages:
+        self.pag += 1
         yield scrapy.Request(
-              url = response.urljoin(f'https://www.chavesnamao.com.br/imoveis-a-venda/sp-sao-paulo/?pg={self.max_page}'),
-              callback=self.parse)
+              url=f'https://www.chavesnamao.com.br/casas-a-venda/{self.estado}-{self.cidade}/?pg={self.pag}',
+              callback=self.parse,
+              errback=self.error_parse)
 
     # Exrair os dados dos imovéis
     def extract_data(self, response):
@@ -34,6 +46,9 @@ class ChavesNaMaoSpider(scrapy.Spider):
       desc = response.css('div[class="pdBox"] ul[class="mainlist"] ::text').getall()
       desc = [item for item in desc if item.strip()]
 
+      descricao = response.css('p[id="dsc"] ::text').getall()
+
+
       quartos = [desc[i-1] for i, item in enumerate(desc) if "Quartos" in item]
       banheiros = [desc[i-1] for i, item in enumerate(desc) if "Banheiros" in item]
       vagas = [desc[i-1] for i, item in enumerate(desc) if "Garagens" in item]
@@ -49,5 +64,23 @@ class ChavesNaMaoSpider(scrapy.Spider):
           'banheiros': banheiros,
           'vagas': vagas,
           'suite': suite,
-          'area': area
+          'area': area,
+          'descricao_anuncio': descricao,
+          'tipo_anuncio': 'compra_venda'
       }
+
+    def error_parse(self, failure):
+      # Registrar erro
+      self.logger.error(f"Erro ao acessar: {failure.request.url}")
+
+      if failure.check(scrapy.exceptions.HttpError):
+        response = failure.value.response
+        self.logger.error(f"Erro HTTP {response.status} ao acessar {response.url}")
+
+      elif failure.check(scrapy.exceptions.DNSLookupError):
+        request = failure.request
+        self.logger.error(f"Erro de DNS ao acessar {request.url}")
+
+      elif failure.check(scrapy.exceptions.TimeoutError):
+        request = failure.request
+        self.logger.error(f"Timeout ao acessar {request.url}")
